@@ -598,7 +598,7 @@ Row  1  2  3  4  5  6       1  2  3  4  5  6       1  2  3  4  5  6
 
 ## Loading the Module
 
-The tier scripts load it automatically. To use it standalone:
+To use it standalone:
 
 ```powershell
 Import-Module .\NewPassword\NewPassword.psm1
