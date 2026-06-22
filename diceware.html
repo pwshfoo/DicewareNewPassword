@@ -340,6 +340,19 @@
     .stego-status:empty { display:none; }
     .stego-status.ok  { color:#16865a; background:rgba(34,168,106,0.1); }
     .stego-status.err { color:#b91c1c; background:rgba(239,68,68,0.08); }
+    /* ── Entropy collector modal ── */
+    #entropyModal { display:none; position:fixed; inset:0; background:rgba(20,30,60,0.72); z-index:9999; align-items:center; justify-content:center; }
+    #entropyModal.active { display:flex; }
+    .entropy-box { background:#fff; border-radius:16px; padding:28px 32px; max-width:460px; width:90%; box-shadow:0 8px 40px rgba(20,40,100,0.28); text-align:center; user-select:none; }
+    .entropy-title { font-family:system-ui,sans-serif; font-weight:700; font-size:15px; color:#1a2540; margin:0 0 6px; }
+    .entropy-desc { font-family:system-ui,sans-serif; font-size:12px; color:#5a6a8a; margin:0 0 4px; }
+    .entropy-zone { border:2px dashed #4a78c8; border-radius:10px; height:130px; margin:12px 0 10px; display:flex; align-items:center; justify-content:center; color:#8898b8; font-family:system-ui,sans-serif; font-size:13px; cursor:crosshair; background:#f4f7ff; transition:background 0.2s; -webkit-user-select:none; touch-action:none; }
+    .entropy-zone.active-zone { background:#eaf0ff; }
+    .entropy-bar-wrap { background:#e8edf5; border-radius:8px; height:10px; overflow:hidden; margin-bottom:6px; }
+    .entropy-bar { height:100%; background:linear-gradient(90deg,#4a78c8,#6aace8); border-radius:8px; width:0%; transition:width 0.08s linear; }
+    .entropy-pct { font-family:system-ui,sans-serif; font-size:12px; color:#4a78c8; font-weight:600; margin-bottom:4px; }
+    .entropy-hint { font-family:system-ui,sans-serif; font-size:11px; color:#9aa8bc; margin-top:8px; line-height:1.5; }
+    .entropy-cancel { font-family:system-ui,sans-serif; margin-top:12px; font-size:12px; color:#9aa8bc; cursor:pointer; text-decoration:underline; }
     /* ── Security notice ── */
     .security-notice {
       background:rgba(74,120,200,0.04); border:1px solid rgba(74,120,200,0.2);
@@ -3660,12 +3673,103 @@ Die 3  1 │  A  B  C  D  E  F     a  b  c  d  e  f     !  @  #  $  %  ^
         el.className = 'stego-status' + (cls ? ' ' + cls : '');
       }
 
-      function genKey() {
-        var key = new Uint8Array(32);
-        crypto.getRandomValues(key);
-        _encKey = key;
-        dlBlob(new Blob([Array.from(key).join('\n')], { type: 'text/plain' }), 'diceware_' + stamp() + '.key');
-        setStatus('stegoKeyStatus', '\u2713 256-bit key generated and downloaded \u2014 keep this file secure', 'ok');
+      function openEntropyModal() {
+        var modal  = document.getElementById('entropyModal');
+        var zone   = document.getElementById('entropyZone');
+        var bar    = document.getElementById('entropyBar');
+        var pctEl  = document.getElementById('entropyPct');
+        var pool   = [];
+        var events = 0;
+        var GOAL   = 64;
+        var done   = false;
+        var lastX  = -1, lastY = -1;
+
+        function addSamples(bytes, n) {
+          if (done) return;
+          for (var b of bytes) pool.push(b);
+          events += n;
+          var pct = Math.min(events / GOAL, 1);
+          bar.style.width = (pct * 100).toFixed(1) + '%';
+          pctEl.textContent = Math.min(events, GOAL) + ' / ' + GOAL + ' samples';
+          if (events >= GOAL) finish();
+        }
+
+        function onMouseMove(e) {
+          var rect = zone.getBoundingClientRect();
+          var x = Math.round(e.clientX - rect.left);
+          var y = Math.round(e.clientY - rect.top);
+          if (x === lastX && y === lastY) return;
+          lastX = x; lastY = y;
+          var t = Math.round(performance.now() * 1000) & 0xFFFFFFFF;
+          addSamples([x & 0xFF, (x >> 8) & 0xFF, y & 0xFF, (y >> 8) & 0xFF,
+                      t & 0xFF, (t >> 8) & 0xFF, (t >> 16) & 0xFF, (t >> 24) & 0xFF], 1);
+          zone.classList.add('active-zone');
+        }
+
+        function onTouchMove(e) {
+          e.preventDefault();
+          var touch = e.touches[0];
+          var rect  = zone.getBoundingClientRect();
+          var x = Math.round(touch.clientX - rect.left);
+          var y = Math.round(touch.clientY - rect.top);
+          if (x === lastX && y === lastY) return;
+          lastX = x; lastY = y;
+          var t = Math.round(performance.now() * 1000) & 0xFFFFFFFF;
+          addSamples([x & 0xFF, (x >> 8) & 0xFF, y & 0xFF, (y >> 8) & 0xFF,
+                      t & 0xFF, (t >> 8) & 0xFF, (t >> 16) & 0xFF, (t >> 24) & 0xFF], 1);
+        }
+
+        function onKeyDown() {
+          var t = Math.round(performance.now() * 1000) & 0xFFFFFFFF;
+          addSamples([t & 0xFF, (t >> 8) & 0xFF, (t >> 16) & 0xFF, (t >> 24) & 0xFF], 1);
+        }
+
+        async function finish() {
+          done = true;
+          cleanup();
+          bar.style.width = '100%';
+          pctEl.textContent = 'Generating\u2026';
+          zone.textContent = '\u2713 Entropy collected';
+          zone.classList.remove('active-zone');
+          // Mix user entropy with CSPRNG via SHA-256.
+          // Key is at least as strong as crypto.getRandomValues alone;
+          // user entropy can only improve it.
+          var seed     = crypto.getRandomValues(new Uint8Array(32));
+          var combined = new Uint8Array(32 + pool.length);
+          combined.set(seed, 0);
+          combined.set(new Uint8Array(pool), 32);
+          var hashBuf  = await crypto.subtle.digest('SHA-256', combined);
+          var key      = new Uint8Array(hashBuf);
+          _encKey = key;
+          dlBlob(new Blob([Array.from(key).join('\n')], { type: 'text/plain' }), 'diceware_' + stamp() + '.key');
+          setStatus('stegoKeyStatus', '\u2713 256-bit key generated with mixed entropy \u2014 keep this file secure', 'ok');
+          setTimeout(function() { modal.classList.remove('active'); }, 900);
+        }
+
+        function cleanup() {
+          zone.removeEventListener('mousemove', onMouseMove);
+          zone.removeEventListener('touchmove', onTouchMove);
+          document.removeEventListener('keydown', onKeyDown);
+        }
+
+        function closeModal() {
+          if (done) return;
+          cleanup();
+          modal.classList.remove('active');
+        }
+
+        pool = []; events = 0; done = false; lastX = -1; lastY = -1;
+        bar.style.width = '0%';
+        pctEl.textContent = '0 / ' + GOAL + ' samples';
+        zone.textContent = 'Move mouse here \u2192';
+        zone.classList.remove('active-zone');
+
+        zone.addEventListener('mousemove', onMouseMove);
+        zone.addEventListener('touchmove', onTouchMove, { passive: false });
+        document.addEventListener('keydown', onKeyDown);
+        document.getElementById('entropyCancelBtn').onclick = closeModal;
+        modal.onclick = function(e) { if (e.target === modal) closeModal(); };
+        modal.classList.add('active');
       }
 
       async function aesEncrypt(keyBytes, plaintext) {
@@ -3774,7 +3878,7 @@ Die 3  1 │  A  B  C  D  E  F     a  b  c  d  e  f     !  @  #  $  %  ^
       }
 
       function wireStego() {
-        document.getElementById('stegoGenKeyBtn').addEventListener('click', genKey);
+        document.getElementById('stegoGenKeyBtn').addEventListener('click', openEntropyModal);
 
         document.getElementById('stegoKeyInput').addEventListener('change', function(e) {
           var f = e.target.files[0]; if (!f) return;
@@ -3823,6 +3927,19 @@ Die 3  1 │  A  B  C  D  E  F     a  b  c  d  e  f     !  @  #  $  %  ^
     displayResult(r);
     window._lastResult = r;
   </script>
+
+  <!-- Entropy collector modal -->
+  <div id="entropyModal" role="dialog" aria-modal="true" aria-label="Collect randomness for key generation">
+    <div class="entropy-box">
+      <div class="entropy-title">&#127922; Collect Randomness for AES-256 Key</div>
+      <p class="entropy-desc">Move your mouse randomly in the box. Also press random keys for extra entropy.</p>
+      <div class="entropy-zone" id="entropyZone">Move mouse here &#8594;</div>
+      <div class="entropy-bar-wrap"><div class="entropy-bar" id="entropyBar"></div></div>
+      <div class="entropy-pct" id="entropyPct">0 / 64 samples</div>
+      <div class="entropy-hint">Your movements are mixed with OS cryptographic randomness via SHA-256.<br>Nothing ever leaves this page.</div>
+      <div class="entropy-cancel" id="entropyCancelBtn">Cancel</div>
+    </div>
+  </div>
 
 </body>
 </html>
