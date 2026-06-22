@@ -38,6 +38,12 @@ EFF Large Wordlist
 
 -------------------------------------------------------------------------------
 
+Dice Table for Generating Salt
+  Published by Arnold G. Reinhold, Cambridge, Mass. USA
+  https://www.theworld.com/%7Ereinhold/dicewarewordlist.pdf page 37
+
+-------------------------------------------------------------------------------
+
 Extensions and modifications (QR code generation/scanning, AES-256-GCM stego
 export/import, print sheet, security notice) are copyright the contributors to
 https://github.com/pwshfoo/DicewareNewPassword and released under MIT.
