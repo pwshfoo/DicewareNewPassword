@@ -1,0 +1,43 @@
+diceware.html
+=============
+This file is based on and incorporates code from the following open-source projects.
+
+-------------------------------------------------------------------------------
+
+diceware-generator
+  Copyright (c) mannyme23
+  MIT License
+  https://github.com/mannyme23/diceware-generator
+  https://opensource.org/licenses/MIT
+
+stegocipher
+  Copyright (c) mannyme23
+  MIT License
+  https://github.com/mannyme23/stegocipher
+  https://opensource.org/licenses/MIT
+
+qrcode-generator v1.4.4
+  Copyright (c) 2009 Kazuhiko Arase
+  MIT License
+  https://github.com/kazuhikoarase/qrcode-generator
+  https://opensource.org/licenses/MIT
+
+jsQR v1.4.0
+  Copyright (c) Cosmo Wolfe
+  Apache License, Version 2.0
+  https://github.com/cozmo/jsQR
+  https://www.apache.org/licenses/LICENSE-2.0
+
+-------------------------------------------------------------------------------
+
+EFF Large Wordlist
+  Published by the Electronic Frontier Foundation (EFF)
+  Creative Commons Attribution 3.0 United States License
+  https://www.eff.org/files/2016/07/18/eff_large_wordlist.txt
+  https://creativecommons.org/licenses/by/3.0/us/
+
+-------------------------------------------------------------------------------
+
+Extensions and modifications (QR code generation/scanning, AES-256-GCM stego
+export/import, print sheet, security notice) are copyright the contributors to
+https://github.com/pwshfoo/DicewareNewPassword and released under MIT.
