@@ -1,3 +1,19 @@
+<!--
+  Based on two projects by mannyme23, both MIT License:
+    diceware-generator  https://github.com/mannyme23/diceware-generator
+    stegocipher         https://github.com/mannyme23/stegocipher
+  Copyright (c) mannyme23 — https://opensource.org/licenses/MIT
+
+  Embedded libraries:
+    qrcode-generator v1.4.4  Copyright (c) Kazuhiko Arase  MIT License
+      https://github.com/kazuhikoarase/qrcode-generator
+    jsQR v1.4.0              Copyright (c) Cosmo Wolfe      Apache-2.0 License
+      https://github.com/cozmo/jsQR
+
+  Extended with QR code generation/scanning, AES-256-GCM stego export/import,
+  print sheet, and security notice.
+  https://github.com/pwshfoo/DicewareNewPassword — GPL-3.0
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -308,10 +324,22 @@
     /* ── QR Scan section ── */
     .scan-section { margin-bottom:16px; padding-bottom:16px; border-bottom:1px solid rgba(0,0,0,0.07); }
     .scan-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:6px; }
+    .scan-row .btn-parse { margin-top:0; }
     .scan-status { font-family:system-ui,sans-serif; font-size:12px; padding:6px 10px; border-radius:6px; display:none; margin-top:6px; }
     .scan-status.ok  { color:#16865a; background:rgba(34,168,106,0.1); }
     .scan-status.err { color:#b91c1c; background:rgba(239,68,68,0.08); }
     #cameraVideo { display:none; width:100%; border-radius:10px; margin-top:8px; max-height:260px; object-fit:cover; background:#000; }
+    /* ── Stego Export/Import ── */
+    .stego-sub-title { font-family:system-ui,sans-serif; font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#5a6a8a; margin:0 0 6px; }
+    .stego-desc { font-family:system-ui,sans-serif; font-size:12px; color:#5a6a8a; line-height:1.65; margin:0 0 12px; }
+    .stego-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:6px; }
+    .stego-filename { font-family:"Courier New",monospace; font-size:11px; color:#4a78c8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:200px; }
+    .stego-or { font-family:system-ui,sans-serif; font-size:12px; color:#8892a4; }
+    .stego-hr { border:none; border-top:1px solid rgba(0,0,0,0.08); margin:18px 0; }
+    .stego-status { font-family:system-ui,sans-serif; font-size:12px; padding:6px 10px; border-radius:6px; margin-top:6px; }
+    .stego-status:empty { display:none; }
+    .stego-status.ok  { color:#16865a; background:rgba(34,168,106,0.1); }
+    .stego-status.err { color:#b91c1c; background:rgba(239,68,68,0.08); }
     /* ── Security notice ── */
     .security-notice {
       background:rgba(74,120,200,0.04); border:1px solid rgba(74,120,200,0.2);
@@ -2773,7 +2801,7 @@ var qrcode = function() {
     <div class="scan-section" id="scanSection">
       <div class="card-section-title" style="font-size:11px;margin-bottom:10px">Scan QR Code</div>
       <div class="scan-row">
-        <label class="btn-parse" style="cursor:pointer;margin:0">
+        <label class="btn-parse" style="cursor:pointer">
           Upload image
           <input type="file" id="qrFileInput" accept="image/*" style="display:none">
         </label>
@@ -2819,6 +2847,46 @@ var qrcode = function() {
 
     <div class="recon-error" id="reconError" style="display:none"></div>
     <button class="btn-generate" id="reconBtn">Reconstruct Passphrase</button>
+  </div>
+
+  <!-- Stego Export / Import -->
+  <div class="card" id="stegoCard">
+    <div class="card-section-title">&#128247; Stego Export / Import</div>
+
+    <div class="stego-sub-title">Encrypt &amp; Embed</div>
+    <p class="stego-desc">Encrypts the current passphrase rolls with <strong>AES-256-GCM</strong> and hides the ciphertext inside a carrier image using <strong>LSB steganography</strong>. The output PNG looks identical to the original &mdash; share it freely. Keep the <code style="font-size:11px;background:rgba(74,120,200,0.08);border-radius:4px;padding:1px 5px;color:#4a78c8">.key</code> file on a separate secure channel.</p>
+
+    <div class="stego-row">
+      <button class="btn-parse" id="stegoGenKeyBtn">Generate AES-256 key</button>
+      <span class="stego-or">or</span>
+      <label class="btn-parse" style="cursor:pointer;margin:0">Load .key file<input type="file" id="stegoKeyInput" style="display:none"></label>
+    </div>
+    <div id="stegoKeyStatus" class="stego-status"></div>
+
+    <div class="stego-row" style="margin-top:10px">
+      <label class="btn-parse" style="cursor:pointer;margin:0">Choose carrier image<input type="file" id="stegoCarrierInput" accept="image/*" style="display:none"></label>
+      <span id="stegoCarrierName" class="stego-filename"></span>
+    </div>
+
+    <button class="btn-generate" id="stegoEmbedBtn" style="margin-top:12px">Encrypt &amp; Embed &rarr; Download PNG</button>
+    <div id="stegoEmbedStatus" class="stego-status"></div>
+
+    <hr class="stego-hr">
+
+    <div class="stego-sub-title">Extract &amp; Decrypt</div>
+    <p class="stego-desc">Upload the stego image and the matching <code style="font-size:11px;background:rgba(74,120,200,0.08);border-radius:4px;padding:1px 5px;color:#4a78c8">.key</code> file to recover the rolls. The Reconstruct card will be filled automatically.</p>
+
+    <div class="stego-row">
+      <label class="btn-parse" style="cursor:pointer;margin:0">Load .key file<input type="file" id="stegoDecKeyInput" style="display:none"></label>
+      <span id="stegoDecKeyName" class="stego-filename"></span>
+    </div>
+    <div class="stego-row" style="margin-top:8px">
+      <label class="btn-parse" style="cursor:pointer;margin:0">Load stego image<input type="file" id="stegoStegoInput" accept="image/*" style="display:none"></label>
+      <span id="stegoStegoName" class="stego-filename"></span>
+    </div>
+
+    <button class="btn-generate" id="stegoExtractBtn" style="margin-top:12px">Extract &amp; Decrypt &rarr; Fill Reconstruct</button>
+    <div id="stegoExtractStatus" class="stego-status"></div>
   </div>
 
   <!-- How It Works -->
@@ -3556,8 +3624,201 @@ Die 3  1 │  A  B  C  D  E  F     a  b  c  d  e  f     !  @  #  $  %  ^
       document.getElementById('printBtn').addEventListener('click', printSheet);
     }
 
+    // ── Stego Export / Import ──────────────────────────────────────────────
+    (function() {
+      var _encKey = null;
+      var _decKey = null;
+
+      function dlBlob(blob, name) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url; a.download = name;
+        document.body.appendChild(a); a.click();
+        setTimeout(function() { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
+      }
+
+      function stamp() {
+        return new Date().toISOString().slice(0,19).replace(/[-T:]/g,'');
+      }
+
+      function parseKeyFile(ab) {
+        var bytes = new Uint8Array(ab);
+        try {
+          var lines = new TextDecoder().decode(bytes).trim().split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean);
+          if (lines.length === 32) {
+            var arr = new Uint8Array(lines.map(Number));
+            if (arr.every(function(b){ return !isNaN(b) && b >= 0 && b <= 255; })) return arr;
+          }
+        } catch(e) {}
+        if (bytes.length === 32) return bytes;
+        return null;
+      }
+
+      function setStatus(id, msg, cls) {
+        var el = document.getElementById(id);
+        el.textContent = msg;
+        el.className = 'stego-status' + (cls ? ' ' + cls : '');
+      }
+
+      function genKey() {
+        var key = new Uint8Array(32);
+        crypto.getRandomValues(key);
+        _encKey = key;
+        dlBlob(new Blob([Array.from(key).join('\n')], { type: 'text/plain' }), 'diceware_' + stamp() + '.key');
+        setStatus('stegoKeyStatus', '\u2713 256-bit key generated and downloaded \u2014 keep this file secure', 'ok');
+      }
+
+      async function aesEncrypt(keyBytes, plaintext) {
+        var iv = crypto.getRandomValues(new Uint8Array(12));
+        var ck = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt']);
+        var ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, ck, new TextEncoder().encode(plaintext)));
+        var payload = new Uint8Array(4 + 12 + ct.length);
+        new DataView(payload.buffer).setUint32(0, 12 + ct.length, false);
+        payload.set(iv, 4);
+        payload.set(ct, 16);
+        return payload;
+      }
+
+      async function aesDecrypt(keyBytes, payload) {
+        var dv = new DataView(payload.buffer, payload.byteOffset);
+        var dataLen = dv.getUint32(0, false);
+        if (dataLen !== payload.length - 4) throw new Error('Payload length mismatch \u2014 not a valid stego image or wrong key');
+        var ck = await crypto.subtle.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['decrypt']);
+        var plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: payload.slice(4, 16) }, ck, payload.slice(16));
+        return new TextDecoder().decode(plain);
+      }
+
+      function lsbEmbed(imgData, data) {
+        var px = imgData.data;
+        var need = data.length * 8;
+        var avail = Math.floor(px.length / 4) * 3;
+        if (need > avail) throw new Error('Image too small: need ' + data.length + ' bytes (' + Math.ceil(need / 3) + ' px min), image has ' + Math.floor(px.length / 4) + ' px');
+        var bit = 0;
+        for (var i = 0; i < px.length && bit < need; i++) {
+          if ((i & 3) === 3) continue;
+          px[i] = (px[i] & 0xFE) | ((data[bit >> 3] >> (7 - (bit & 7))) & 1);
+          bit++;
+        }
+      }
+
+      function lsbExtract(imgData, byteCount) {
+        var px = imgData.data;
+        var out = new Uint8Array(byteCount);
+        var bit = 0, total = byteCount * 8;
+        for (var i = 0; i < px.length && bit < total; i++) {
+          if ((i & 3) === 3) continue;
+          out[bit >> 3] |= (px[i] & 1) << (7 - (bit & 7));
+          bit++;
+        }
+        return out;
+      }
+
+      function loadImg(file) {
+        return new Promise(function(res, rej) {
+          var url = URL.createObjectURL(file);
+          var img = new Image();
+          img.onload = function() { URL.revokeObjectURL(url); res(img); };
+          img.onerror = function() { URL.revokeObjectURL(url); rej(new Error('Cannot decode image')); };
+          img.src = url;
+        });
+      }
+
+      function imgCanvas(img) {
+        var c = document.createElement('canvas');
+        c.width = img.width; c.height = img.height;
+        c.getContext('2d').drawImage(img, 0, 0);
+        return c;
+      }
+
+      async function doEmbed() {
+        setStatus('stegoEmbedStatus', '', '');
+        if (!_encKey)                               { setStatus('stegoEmbedStatus', 'Generate or load a key file first.', 'err'); return; }
+        var cFile = document.getElementById('stegoCarrierInput').files[0];
+        if (!cFile)                                 { setStatus('stegoEmbedStatus', 'Choose a carrier image first.', 'err'); return; }
+        if (!window._lastResult)                    { setStatus('stegoEmbedStatus', 'Generate a passphrase first.', 'err'); return; }
+        try {
+          setStatus('stegoEmbedStatus', 'Encrypting\u2026', '');
+          var payload = await aesEncrypt(_encKey, buildJsonExport(window._lastResult));
+          setStatus('stegoEmbedStatus', 'Embedding\u2026', '');
+          var canvas = imgCanvas(await loadImg(cFile));
+          var ctx = canvas.getContext('2d');
+          var id = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          lsbEmbed(id, payload);
+          ctx.putImageData(id, 0, 0);
+          canvas.toBlob(function(blob) {
+            dlBlob(blob, 'stego_' + stamp() + '.png');
+            setStatus('stegoEmbedStatus',
+              '\u2713 Stego PNG downloaded (' + payload.length + ' bytes hidden in ' +
+              canvas.width + '\xd7' + canvas.height + ' px). Keep the .key on a separate channel.', 'ok');
+          }, 'image/png');
+        } catch(e) { setStatus('stegoEmbedStatus', 'Error: ' + e.message, 'err'); }
+      }
+
+      async function doExtract() {
+        setStatus('stegoExtractStatus', '', '');
+        if (!_decKey)                               { setStatus('stegoExtractStatus', 'Load the .key file first.', 'err'); return; }
+        var sFile = document.getElementById('stegoStegoInput').files[0];
+        if (!sFile)                                 { setStatus('stegoExtractStatus', 'Load the stego image first.', 'err'); return; }
+        try {
+          setStatus('stegoExtractStatus', 'Extracting\u2026', '');
+          var canvas = imgCanvas(await loadImg(sFile));
+          var id = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+          var hdr = lsbExtract(id, 4);
+          var payloadLen = new DataView(hdr.buffer).getUint32(0, false) + 4;
+          var json = await aesDecrypt(_decKey, lsbExtract(id, payloadLen));
+          processQRData(json);
+          setStatus('stegoExtractStatus', '\u2713 Decrypted \u2014 Reconstruct card filled.', 'ok');
+        } catch(e) {
+          setStatus('stegoExtractStatus', 'Failed: wrong key, or this image has no embedded data.', 'err');
+        }
+      }
+
+      function wireStego() {
+        document.getElementById('stegoGenKeyBtn').addEventListener('click', genKey);
+
+        document.getElementById('stegoKeyInput').addEventListener('change', function(e) {
+          var f = e.target.files[0]; if (!f) return;
+          var fr = new FileReader();
+          fr.onload = function(ev) {
+            var kb = parseKeyFile(ev.target.result);
+            if (kb) { _encKey = kb; setStatus('stegoKeyStatus', '\u2713 Key loaded: ' + f.name, 'ok'); }
+            else    { setStatus('stegoKeyStatus', 'Invalid: must be 32 decimal lines or 32 raw bytes.', 'err'); }
+          };
+          fr.readAsArrayBuffer(f);
+        });
+
+        document.getElementById('stegoCarrierInput').addEventListener('change', function(e) {
+          var f = e.target.files[0];
+          document.getElementById('stegoCarrierName').textContent = f ? f.name : '';
+        });
+
+        document.getElementById('stegoEmbedBtn').addEventListener('click', doEmbed);
+
+        document.getElementById('stegoDecKeyInput').addEventListener('change', function(e) {
+          var f = e.target.files[0]; if (!f) return;
+          var fr = new FileReader();
+          fr.onload = function(ev) {
+            var kb = parseKeyFile(ev.target.result);
+            if (kb) { _decKey = kb; document.getElementById('stegoDecKeyName').textContent = '\u2713 ' + f.name; setStatus('stegoExtractStatus', '', ''); }
+            else    { document.getElementById('stegoDecKeyName').textContent = 'Invalid key file'; }
+          };
+          fr.readAsArrayBuffer(f);
+        });
+
+        document.getElementById('stegoStegoInput').addEventListener('change', function(e) {
+          var f = e.target.files[0];
+          document.getElementById('stegoStegoName').textContent = f ? f.name : '';
+        });
+
+        document.getElementById('stegoExtractBtn').addEventListener('click', doExtract);
+      }
+
+      window._wireStego = wireStego;
+    })();
+
     // ── Bootstrap ──────────────────────────────────────────────────────────
     wireControls();
+    window._wireStego();
     const r = generate();
     displayResult(r);
     window._lastResult = r;
