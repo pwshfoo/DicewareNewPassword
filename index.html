@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diceware Passphrase Generator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e8edf5 50%, #dde4f0 100%);
+      font-family: Georgia, "Palatino Linotype", serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px 64px;
+      color: #1a2540;
+    }
+
+    .badge {
+      display: inline-flex; 
+      align-items: center; 
+      gap: 10px;
+      background: rgba(255,255,255,0.7); 
+      border-radius: 50px;
+      padding: 6px 16px; 
+      border: 1px solid rgba(74,120,200,0.2);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06); 
+      margin-bottom: 14px;
+      font-family: system-ui, sans-serif; 
+      font-size: 12px;
+      letter-spacing: 2px; 
+      color: #4a78c8; 
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      font-size: 44px; 
+      font-weight: normal; 
+      letter-spacing: -0.5px;
+      margin-bottom: 10px; 
+      text-align: center;
+    }
+
+    .subtitle {
+      color: #6b7a99; 
+      font-size: 16px; 
+      font-family: system-ui, sans-serif;
+      line-height: 1.6; 
+      text-align: center; 
+      margin-bottom: 48px; 
+      max-width: 720px;
+    }
+
+    .card {
+      background: rgba(255,255,255,0.85);
+      border-radius: 24px; 
+      padding: 32px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.1);
+      border: 1px solid rgba(255,255,255,0.9);
+      width: 100%; 
+      max-width: 720px;
+      margin-bottom: 24px;
+    }
+
+    .card h2 {
+      font-size: 24px;
+      font-weight: normal;
+      margin-bottom: 16px;
+      color: #1a2540;
+    }
+
+    .card p {
+      font-size: 15px;
+      line-height: 1.8;
+      margin-bottom: 12px;
+      color: #4a5568;
+    }
+
+    .card ul {
+      font-size: 15px;
+      line-height: 1.8;
+      color: #4a5568;
+      margin-left: 24px;
+      margin-bottom: 12px;
+    }
+
+    .card li {
+      margin-bottom: 8px;
+    }
+
+    .btn-primary {
+      display: inline-block;
+      padding: 14px 28px;
+      background: linear-gradient(135deg, #4a78c8, #5a8fd8);
+      color: #fff;
+      border: none;
+      border-radius: 14px;
+      font-family: system-ui, sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      letter-spacing: 0.5px;
+      box-shadow: 0 4px 16px rgba(74,120,200,0.4);
+      transition: transform 0.1s, box-shadow 0.2s;
+      margin-top: 16px;
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 6px 24px rgba(74,120,200,0.55);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin: 20px 0;
+    }
+
+    @media (max-width: 600px) {
+      .feature-grid { grid-template-columns: 1fr; }
+    }
+
+    .feature-item {
+      background: rgba(74,120,200,0.06);
+      border-left: 3px solid #4a78c8;
+      padding: 16px;
+      border-radius: 8px;
+    }
+
+    .feature-item h3 {
+      font-size: 14px;
+      font-weight: 600;
+      font-family: system-ui, sans-serif;
+      color: #2d5fa8;
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .feature-item p {
+      font-size: 13px;
+      color: #4a5568;
+      margin: 0;
+    }
+
+    .security-notice {
+      background: rgba(139,92,246,0.08);
+      border-left: 4px solid #7c3aed;
+      padding: 16px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+
+    .security-notice h3 {
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: #6b21a8;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .security-notice p {
+      font-size: 13px;
+      color: #6b21a8;
+      margin: 0;
+    }
+
+    .links {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-top: 20px;
+    }
+
+    .link-btn {
+      display: inline-block;
+      padding: 10px 16px;
+      background: rgba(255,255,255,0.9);
+      border: 1.5px solid rgba(74,120,200,0.25);
+      border-radius: 12px;
+      font-family: system-ui, sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      color: #4a78c8;
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .link-btn:hover {
+      background: rgba(74,120,200,0.1);
+      border-color: rgba(74,120,200,0.5);
+    }
+
+    .footer {
+      font-family: system-ui, sans-serif;
+      font-size: 12px;
+      color: #8892a4;
+      text-align: center;
+      margin-top: 40px;
+      max-width: 720px;
+    }
+
+    .footer a {
+      color: #4a78c8;
+      text-decoration: none;
+    }
+
+    .footer a:hover {
+      text-decoration: underline;
+    }
+
+    code {
+      background: rgba(74,120,200,0.06);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      color: #2d5fa8;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="badge">🎲 Cryptographically Secure</div>
+  <h1>Diceware Passphrase Generator</h1>
+  <p class="subtitle">Generate strong, memorable passphrases using physical dice simulation and the EFF wordlist. Works entirely offline in your browser — no tracking, no servers, no dependencies. Built on <strong>mannyme23</strong>'s excellent <a href="https://github.com/mannyme23/diceware-generator" style="color: #4a78c8; text-decoration: underline;" target="_blank">diceware-generator</a> and <a href="https://github.com/mannyme23/stegocipher" style="color: #4a78c8; text-decoration: underline;" target="_blank">stegocipher</a> projects.</p>
+
+  <!-- Main CTA -->
+  <div class="card">
+    <h2>Generate Your Passphrase</h2>
+    <p>Click below to open the interactive Diceware generator. Customize word count, separators, salt characters, and more. All processing happens locally on your device.</p>
+    <a href="./diceware.html" class="btn-primary">Open Generator →</a>
+  </div>
+
+  <!-- About -->
+  <div class="card">
+    <h2>About Diceware</h2>
+    <p>Diceware is a method for generating strong passphrases by simulating dice rolls using a public wordlist. Each sequence of five dice rolls maps to one word from the EFF's large wordlist of 7,776 carefully selected English words.</p>
+    <p><strong>Why Diceware?</strong></p>
+    <ul>
+      <li><strong>Memorable:</strong> Natural language words are easier to remember than random characters</li>
+      <li><strong>Strong entropy:</strong> Each word contributes ~12.9 bits; 4 words + 5 salt chars ≈ 87 bits (exceeds 80-bit "Tier 0" standard)</li>
+      <li><strong>Auditable:</strong> Save the dice rolls and reconstruct your passphrase exactly</li>
+      <li><strong>Public method:</strong> The wordlist and algorithm are fully documented — security comes from the randomness, not obscurity</li>
+    </ul>
+  </div>
+
+  <!-- Features -->
+  <div class="card">
+    <h2>Features</h2>
+    <div class="feature-grid">
+      <div class="feature-item">
+        <h3>🔐 Crypto-Secure</h3>
+        <p>Uses <code>crypto.getRandomValues()</code> with rejection sampling — no weaker <code>Math.random()</code></p>
+      </div>
+      <div class="feature-item">
+        <h3>📊 Entropy Display</h3>
+        <p>Real-time entropy calculation with tier badges (Tier 0 / 1 / 2) and visual breakdown</p>
+      </div>
+      <div class="feature-item">
+        <h3>🔄 Reconstruct</h3>
+        <p>Paste saved rolls as JSON to re-derive your passphrase exactly</p>
+      </div>
+      <div class="feature-item">
+        <h3>🎫 QR Codes</h3>
+        <p>Encode rolls into a scannable QR code; scan to auto-fill reconstruction</p>
+      </div>
+      <div class="feature-item">
+        <h3>🖨️ Print Sheet</h3>
+        <p>A4 single-page layout with rolls, QR code, and reconstruction command</p>
+      </div>
+      <div class="feature-item">
+        <h3>🌐 Fully Offline</h3>
+        <p>All code, wordlist, and libraries embedded inline — works with no internet</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Security & Entropy -->
+  <div class="card">
+    <h2>Security &amp; Entropy</h2>
+    <p><strong>Default passphrase (4 words + 5 salt chars):</strong> ~86.9 bits of entropy</p>
+    <div class="security-notice">
+      <h3>✓ Meets Enterprise Requirements</h3>
+      <p><strong>Tier 0 / Domain Admin:</strong> ≥ 80 bits required — this exceeds it by 6.9 bits. Use <code>-WordCount 5</code> for ~100 bits.</p>
+    </div>
+    <p><strong>Entropy breakdown:</strong></p>
+    <ul>
+      <li>4 Diceware words: 51.7 bits</li>
+      <li>5 salt characters (95 unique): 32.9 bits</li>
+      <li>Random salt position: +2.3 bits</li>
+    </ul>
+    <p style="margin-top: 16px;"><strong>Why the public wordlist doesn't weaken it:</strong> Diceware follows Kerckhoffs's principle — security comes from the secret (your dice rolls), not obscurity. AES, RSA, and SHA-256 are all public too.</p>
+  </div>
+
+  <!-- PowerShell Module -->
+  <div class="card">
+    <h2>PowerShell Module</h2>
+    <p>This project includes a revamped <code>NewPassword.psm1</code> module — a complete rewrite of a legacy module used across many production scripts. It generates cryptographically secure passphrases, random character strings, and supports AES-256-GCM encryption with optional LSB steganography for offline password sharing.</p>
+    
+    <h3 style="font-size: 18px; font-weight: normal; margin-top: 20px; margin-bottom: 12px; color: #1a2540;">Installation</h3>
+    <p><code>Import-Module .\NewPassword\NewPassword.psm1</code></p>
+    
+    <h3 style="font-size: 18px; font-weight: normal; margin-top: 20px; margin-bottom: 12px; color: #1a2540;">Quick Start</h3>
+    <p style="margin-bottom: 8px;"><strong>Generate a passphrase:</strong></p>
+    <p><code>New-Password -WordCount 4 -SaltChars 5 -UppercaseFirstLetter</code></p>
+    
+    <p style="margin-top: 16px; margin-bottom: 8px;"><strong>Export encrypted + embedded in stego images:</strong></p>
+    <p><code>New-Password -Export -KeyCarrierImage .\photo1.jpg -DataCarrierImage .\photo2.jpg</code></p>
+    
+    <p style="margin-top: 16px; margin-bottom: 8px;"><strong>Recover from encrypted files:</strong></p>
+    <p><code>Get-Password -Import -KeyCarrierImage .\photo1_key.bmp -DataCarrierImage .\photo2_data.bmp</code></p>
+    
+    <h3 style="font-size: 18px; font-weight: normal; margin-top: 20px; margin-bottom: 12px; color: #1a2540;">Key Features</h3>
+    <ul>
+      <li><strong>Crypto-secure RNG:</strong> Uses <code>RandomNumberGenerator</code> (PS7/.NET 5+) or <code>RNGCryptoServiceProvider</code> (PS5.1)</li>
+      <li><strong>AES-256-GCM encryption:</strong> Export passphrases with cryptographically secure keys</li>
+      <li><strong>LSB steganography:</strong> Hide encrypted data inside BMP/PNG/JPEG images — send via separate channels</li>
+      <li><strong>Offline password sharing:</strong> Two stego images containing key + encrypted data — neither image is sufficient alone</li>
+      <li><strong>Auditable reconstruction:</strong> Save rolls as JSON; reconstruct exact passphrase later</li>
+      <li><strong>Enterprise entropy:</strong> Meets Tier 0 (≥80 bits) requirements out of the box</li>
+    </ul>
+
+    <h3 style="font-size: 18px; font-weight: normal; margin-top: 20px; margin-bottom: 12px; color: #1a2540;">Use Case: Offline Password Sharing</h3>
+    <p>This module was designed to solve a real problem: <strong>sharing passwords securely with no network dependency.</strong></p>
+    <p style="margin-top: 12px;">Alice generates a password, then:</p>
+    <ol style="margin-left: 24px; margin-top: 12px;">
+      <li>Exports it encrypted to two separate stego images (e.g., office.jpg → office_key.bmp, team.jpg → team_data.bmp)</li>
+      <li>Sends office_key.bmp via one channel (email, USB stick, hand-delivery)</li>
+      <li>Sends team_data.bmp via a separate channel (Slack, different USB, different person)</li>
+      <li>Bob receives both images, then: <code>Get-Password -Import -KeyCarrierImage office_key.bmp -DataCarrierImage team_data.bmp</code></li>
+      <li>The password is recovered without ever existing in plaintext on any network</li>
+    </ol>
+
+    <h3 style="font-size: 18px; font-weight: normal; margin-top: 20px; margin-bottom: 12px; color: #1a2540;">Module State: $global:DICEWARE</h3>
+    <p>Every call to <code>New-Password</code> automatically stores the result in <code>$global:DICEWARE</code>, a global variable that holds:</p>
+    <ul style="margin-top: 8px;">
+      <li><code>Password</code> — SecureString (never plain text in memory by default)</li>
+      <li><code>Rolls</code> — Array of 5-digit word roll keys</li>
+      <li><code>SaltRolls</code> — Array of 3-digit salt character rolls (if applicable)</li>
+      <li><code>SaltPosition</code> — Where the salt was inserted</li>
+      <li><code>Separator</code>, <code>UppercaseFirstLetter</code> — Reconstruction settings</li>
+      <li><code>Entropy</code> — Detailed entropy breakdown (word bits, salt bits, position bits, total)</li>
+    </ul>
+    <p style="margin-top: 12px;"><strong>Why this matters:</strong> You can generate a password, use it immediately, and then decide later to export or hide it without regenerating:</p>
+    <p style="margin-top: 8px;"><code>New-Password</code> &nbsp;→ [use it] &nbsp;→ <code>Save-PasswordToFile</code> or <code>Hide-PasswordFiles</code></p>
+    <p style="margin-top: 8px;">Or retrieve it: <code>Get-LastPassword</code> or <code>Get-LastPassword -CopyToClipboard</code></p>
+
+    <h3 style="font-size: 18px; font-weight: normal; margin-top: 20px; margin-bottom: 12px; color: #1a2540;">Available Functions</h3>
+    <div class="feature-grid" style="margin-top: 16px;">
+      <div class="feature-item">
+        <h3>New-Password</h3>
+        <p>Generate a diceware passphrase with options for word count, separators, salt, and encryption</p>
+      </div>
+      <div class="feature-item">
+        <h3>Get-Password</h3>
+        <p>Import from encrypted files or stego images; reconstruct from saved rolls</p>
+      </div>
+      <div class="feature-item">
+        <h3>New-DicewareRandomString</h3>
+        <p>Generate random special chars/digits using the 3-dice table</p>
+      </div>
+      <div class="feature-item">
+        <h3>Save-PasswordToFile</h3>
+        <p>Export passphrase as AES-256-GCM encrypted JSON + key file</p>
+      </div>
+      <div class="feature-item">
+        <h3>Get-PasswordFromFile</h3>
+        <p>Decrypt and restore from .key + .jsonenc files</p>
+      </div>
+      <div class="feature-item">
+        <h3>Hide-PasswordFiles</h3>
+        <p>Embed encrypted password data inside stego BMP images</p>
+      </div>
+    </div>
+
+    <div class="links">
+      <a href="./README.MD" class="link-btn">📖 Full Module Docs</a>
+      <a href="./NewPassword/" class="link-btn">🗂️ Module Folder</a>
+      <a href="https://github.com/mannyme23/stegocipher" class="link-btn" target="_blank">🔗 Original stegocipher</a>
+    </div>
+  </div>
+
+  <!-- Attribution & Origins -->
+  <div class="card">
+    <h2>Attribution & Project History</h2>
+    <p><strong>This project is built upon excellent open-source work:</strong></p>
+    <ul>
+      <li><a href="https://github.com/mannyme23/diceware-generator" style="color: #4a78c8;" target="_blank"><strong>diceware-generator</strong></a> by <strong>mannyme23</strong> — The browser-based Diceware generator that inspired the HTML/JS layout and QR code integration</li>
+      <li><a href="https://github.com/mannyme23/stegocipher" style="color: #4a78c8;" target="_blank"><strong>stegocipher</strong></a> by <strong>mannyme23</strong> — LSB steganography implementation for embedding data in images</li>
+      <li><a href="https://github.com/kazuhikoarase/qrcode-generator" style="color: #4a78c8;" target="_blank"><strong>qrcode-generator</strong></a> by Kazuhiko Arase (MIT)</li>
+      <li><a href="https://github.com/cozmo/jsQR" style="color: #4a78c8;" target="_blank"><strong>jsQR</strong></a> by Cosmo Wolfe (Apache 2.0) — QR code scanning</li>
+      <li><a href="https://www.eff.org/files/2016/07/18/eff_large_wordlist.txt" style="color: #4a78c8;" target="_blank"><strong>EFF Large Wordlist</strong></a> (CC-BY-3.0 US)</li>
+    </ul>
+
+    <h3 style="font-size: 16px; font-weight: normal; margin-top: 20px; margin-bottom: 12px; color: #1a2540;">Our Customizations</h3>
+    <p>I loved mannyme23's approach and visual design, but needed to extend and specialize the solution:</p>
+    <ul>
+      <li><strong>Revamped PowerShell module:</strong> Created a complete rewrite of my legacy <code>NewPassword</code> module (which had worked well but became tedious to restore after migrating computers). This new version adds modern encryption, is fully auditable, and integrates perfectly with the browser generator.</li>
+      <li><strong>Enhanced stego support:</strong> Improved steganography handling with two-channel password sharing (key image + data image sent separately)</li>
+      <li><strong>Security improvements:</strong> AES-256-GCM encryption, better RNG handling across PS5.1 and PS7, enterprise entropy targets (Tier 0 ≥ 80 bits)</li>
+      <li><strong>Documentation:</strong> Comprehensive README, NOTICE file, and this landing page explaining use cases</li>
+      <li><strong>Auditable design:</strong> JSON export/import of rolls, reconstruction commands, and complete offline workflows</li>
+    </ul>
+
+    <h3 style="font-size: 16px; font-weight: normal; margin-top: 20px; margin-bottom: 12px; color: #1a2540;">Why This Matters</h3>
+    <p>The Diceware method + LSB steganography creates a unique workflow: <strong>offline, auditable, memorable password sharing.</strong> Whether you're sharing credentials with a colleague, backing up a recovery seed, or just generating stronger passphrases, this solution works without relying on password managers, cloud storage, or any network.</p>
+
+    <p style="margin-top: 16px; font-size: 13px;">See <a href="./NOTICE" style="color: #4a78c8;">NOTICE</a> for full attribution and licenses.</p>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>🔗 <strong>Project:</strong> <a href="https://github.com" target="_blank">View on GitHub</a> | <strong>License:</strong> See LICENSE file | <strong>Credits:</strong> <a href="./NOTICE" target="_blank">NOTICE</a></p>
+    <p style="margin-top: 8px;">This site is hosted via GitHub Pages. All processing happens in your browser — no data is collected or transmitted.</p>
+  </div>
+
+</body>
+</html>
