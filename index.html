@@ -257,6 +257,8 @@
       <li><strong>Auditable:</strong> Save the dice rolls and reconstruct your passphrase exactly</li>
       <li><strong>Public method:</strong> The wordlist and algorithm are fully documented — security comes from the randomness, not obscurity</li>
     </ul>
+    <p>I wanted a system to help me generate strong passwords. I also wanted an output method of <code>[System.Security.SecureString]</code> so that I could use it directly in account creation and other scripts. The PowerShell module was the start of that, and the browser UI (`diceware.html`) became the more robust and flexible system to achieve it.</p>
+    <p>Most importantly, I needed a way to securely share passwords between colleagues and friends. I wanted something I could share with colleagues, friends, and family to help them build strong, memorable passwords that could be recorded offline and reconstructed later. Not everyone has the technical clout to handle a password manager. If you truly want a secure password for an account (like a Glass Breaker), you may want to store it in different physical locations offline, such as paper or a USB thumb drive.</p>
   </div>
 
   <!-- Features -->
@@ -345,6 +347,20 @@
       <li>Bob receives both images, then: <code>Get-Password -Import -KeyCarrierImage office_key.bmp -DataCarrierImage team_data.bmp</code></li>
       <li>The password is recovered without ever existing in plaintext on any network</li>
     </ol>
+
+    <div class="card" style="margin-top:16px; padding:16px;">
+      <h3 style="font-size:16px; margin-bottom:8px;">Example: Export</h3>
+      <pre style="white-space:pre-wrap; background:rgba(74,120,200,0.03); padding:12px; border-radius:8px; border:1px solid rgba(74,120,200,0.08);"><code>PS C:\repo\DicewareNewPassword> Get-Password -LastPassword -Export \
+  -KeyCarrierImage "C:\Users\&lt;redacted&gt;\Pictures\photoA.jpg" \
+  -DataCarrierImage "C:\Users\&lt;redacted&gt;\Pictures\photoB.jpg"
+
+Key generated: C:\...\.password\20260627_104236.key
+Encrypted JSON: C:\...\.password\20260627_104236.jsonenc
+Key stego -> C:\...\.password\20260627_104236_key.bmp
+Data stego -> C:\...\.password\20260627_104236_data.bmp
+</code></pre>
+      <p><strong>Note:</strong> By default exported files are written to a <code>.password</code> folder under the current working directory. You can override paths with <code>-KeyFilePath</code>, <code>-EncryptedJsonPath</code>, <code>-KeyStegoOutput</code>, and <code>-DataStegoOutput</code>.</p>
+    </div>
 
     <h3 style="font-size: 18px; font-weight: normal; margin-top: 20px; margin-bottom: 12px; color: #1a2540;">Module State: $global:DICEWARE</h3>
     <p>Every call to <code>New-Password</code> automatically stores the result in <code>$global:DICEWARE</code>, a global variable that holds:</p>
