@@ -12,7 +12,6 @@ PowerShell module for generating cryptographically unpredictable passphrases and
 | `eff_large_wordlist.txt` | EFF large wordlist (7776 words, tab-delimited) |
 | `diceware.html` | Self-contained offline passphrase generator with QR code, scan, and print sheet |
 | `diceware.html.SHA256` | SHA-256 integrity hash — verify with `Get-FileHash .\diceware.html -Algorithm SHA256` |
-| `diceware.zip` | Zip archive of `diceware.html` for distribution |
 
 ---
 
@@ -21,6 +20,18 @@ PowerShell module for generating cryptographically unpredictable passphrases and
 A single self-contained HTML file that mirrors the behaviour of `New-Password` and `Get-Password` entirely in the browser. Open it directly from the filesystem — no web server, no dependencies, no network requests. All JavaScript, the EFF wordlist, and QR libraries are embedded inline; the file works fully offline once saved.
 
 > **If downloading from a hosted location:** right-click → **Save As** to save a local copy, then open it from disk. Verify integrity with `Get-FileHash .\diceware.html -Algorithm SHA256` against `diceware.html.SHA256`.
+
+```powershel
+iwr "https://raw.githubusercontent.com/pwshfoo/DicewareNewPassword/refs/heads/main/diceware.html" -OutFile "diceware.html" 
+iwr "https://raw.githubusercontent.com/pwshfoo/DicewareNewPassword/refs/heads/main/diceware.html.SHA256" -OutFile "diceware.html.SHA256"
+if ((Get-FileHash ".\diceware.html" -Algorithm SHA256).Hash -eq (Get-Content ".\diceware.html.SHA256")) { 
+    Write-Host "MATCH: File is secure!" -ForegroundColor Green
+    ii .\diceware.html 
+} else { 
+    Write-Warning "MISMATCH: Do not use this file!"
+    rm .\diceware.html 
+}
+```
 
 ### Features
 
