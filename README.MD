@@ -25,11 +25,9 @@ A single self-contained HTML file that mirrors the behaviour of `New-Password` a
 iwr "https://raw.githubusercontent.com/pwshfoo/DicewareNewPassword/refs/heads/main/diceware.html" -OutFile "diceware.html" 
 iwr "https://raw.githubusercontent.com/pwshfoo/DicewareNewPassword/refs/heads/main/diceware.html.SHA256" -OutFile "diceware.html.SHA256"
 if ((Get-FileHash ".\diceware.html" -Algorithm SHA256).Hash -eq (Get-Content ".\diceware.html.SHA256")) { 
-    Write-Host "MATCH: File is secure!" -ForegroundColor Green
-    ii .\diceware.html 
+   Write-Host "MATCH: File is secure!" -ForegroundColor Green
 } else { 
-    Write-Warning "MISMATCH: Do not use this file!"
-    rm .\diceware.html 
+   Write-Warning "MISMATCH: Do not use this file!"
 }
 ```
 
