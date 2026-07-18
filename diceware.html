@@ -2901,6 +2901,23 @@ var qrcode = function() {
 
     <button class="btn-generate" id="stegoExtractBtn" style="margin-top:12px">Extract &amp; Decrypt &rarr; Fill Reconstruct</button>
     <div id="stegoExtractStatus" class="stego-status"></div>
+
+    <hr class="stego-hr">
+
+    <div class="stego-sub-title">From PowerShell Files</div>
+    <p class="stego-desc">Load the <code style="font-size:11px;background:rgba(74,120,200,0.08);border-radius:4px;padding:1px 5px;color:#4a78c8">.key</code> and <code style="font-size:11px;background:rgba(74,120,200,0.08);border-radius:4px;padding:1px 5px;color:#4a78c8">.jsonenc</code> files produced by <code style="font-size:11px;background:rgba(74,120,200,0.08);border-radius:4px;padding:1px 5px;color:#4a78c8">New-Password&nbsp;-Export</code> or <code style="font-size:11px;background:rgba(74,120,200,0.08);border-radius:4px;padding:1px 5px;color:#4a78c8">Save-PasswordToFile</code>. Decrypts AES-256-CBC &mdash; compatible with <code style="font-size:11px;background:rgba(74,120,200,0.08);border-radius:4px;padding:1px 5px;color:#4a78c8">Get-PasswordFromFile</code> on the PowerShell side.</p>
+
+    <div class="stego-row">
+      <label class="btn-parse" style="cursor:pointer;margin:0">Load .key file<input type="file" id="psDecKeyInput" style="display:none"></label>
+      <span id="psDecKeyName" class="stego-filename"></span>
+    </div>
+    <div class="stego-row" style="margin-top:8px">
+      <label class="btn-parse" style="cursor:pointer;margin:0">Load .jsonenc file<input type="file" id="psJsonEncInput" style="display:none"></label>
+      <span id="psJsonEncName" class="stego-filename"></span>
+    </div>
+
+    <button class="btn-generate" id="psImportBtn" style="margin-top:12px">Decrypt PS Files &rarr; Fill Reconstruct</button>
+    <div id="psImportStatus" class="stego-status"></div>
   </div>
 
   <!-- How It Works -->
@@ -3640,8 +3657,9 @@ Die 3  1 │  A  B  C  D  E  F     a  b  c  d  e  f     !  @  #  $  %  ^
 
     // ── Stego Export / Import ──────────────────────────────────────────────
     (function() {
-      var _encKey = null;
-      var _decKey = null;
+      var _encKey  = null;
+      var _decKey  = null;
+      var _psDecKey = null;
 
       function dlBlob(blob, name) {
         var url = URL.createObjectURL(blob);
@@ -3793,6 +3811,85 @@ Die 3  1 │  A  B  C  D  E  F     a  b  c  d  e  f     !  @  #  $  %  ^
         return new TextDecoder().decode(plain);
       }
 
+      // Read a file, auto-detect UTF-16LE / UTF-8 BOM, return trimmed text
+      function readFileBom(file) {
+        return new Promise(function(res, rej) {
+          var fr = new FileReader();
+          fr.onload = function(ev) {
+            var buf = ev.target.result;
+            var b   = new Uint8Array(buf);
+            var txt;
+            if (b.length >= 2 && b[0] === 0xFF && b[1] === 0xFE) {
+              txt = new TextDecoder('utf-16le').decode(buf);
+            } else if (b.length >= 3 && b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF) {
+              txt = new TextDecoder('utf-8').decode(buf.slice(3));
+            } else {
+              txt = new TextDecoder('utf-8').decode(buf);
+            }
+            res(txt.replace(/^\uFEFF/, '').trim());
+          };
+          fr.onerror = rej;
+          fr.readAsArrayBuffer(file);
+        });
+      }
+
+      // Decrypt a PowerShell ConvertFrom-SecureString -Key .jsonenc file
+      // Format (Base64-encoded): [16-byte AES-CBC IV][AES-CBC-PKCS7 ciphertext]
+      // Plaintext is UTF-16LE (SecureString internal encoding)
+      // PS ConvertFrom-SecureString -Key format (PS5.1 and PS7 identical):
+      //   <32-hex-fixed-magic><Base64( UTF-16LE("2|<ciphertext-b64>|<iv-hex>") )>
+      var PS_MAGIC = '76492d1116743f0423413b16050a5345';
+
+      async function doPsImport() {
+        setStatus('psImportStatus', '', '');
+        if (!_psDecKey) { setStatus('psImportStatus', 'Load the .key file first.', 'err'); return; }
+        var jFile = document.getElementById('psJsonEncInput').files[0];
+        if (!jFile)    { setStatus('psImportStatus', 'Load the .jsonenc file first.', 'err'); return; }
+        try {
+          setStatus('psImportStatus', 'Decrypting\u2026', '');
+          var content = await readFileBom(jFile);
+
+          // Validate and strip the fixed magic prefix
+          if (!content.startsWith(PS_MAGIC)) {
+            throw new Error('Missing PS magic header \u2014 is this a .jsonenc from Save-PasswordToFile?');
+          }
+
+          // Base64-decode the remainder, then decode as UTF-16LE to get the inner string
+          var innerBytes;
+          try { innerBytes = Uint8Array.from(atob(content.substring(32)), function(c) { return c.charCodeAt(0); }); }
+          catch(e) { throw new Error('Inner content is not valid Base64.'); }
+
+          var inner = new TextDecoder('utf-16le').decode(innerBytes);
+          // inner = "2|<iv-base64>|<ciphertext-hex>"
+          var parts = inner.split('|');
+          if (parts.length !== 3 || parts[0] !== '2') {
+            throw new Error('Unexpected inner format (expected "2|ciphertext|iv"). Got: ' + inner.substring(0, 40));
+          }
+
+          // Decode IV (Base64, parts[1]) and ciphertext (hex, parts[2])
+          var iv;
+          try { iv = Uint8Array.from(atob(parts[1]), function(c) { return c.charCodeAt(0); }); }
+          catch(e) { throw new Error('IV field is not valid Base64.'); }
+          if (iv.length !== 16) throw new Error('IV is not 16 bytes (got ' + iv.length + ').');
+
+          var ctHex = parts[2];
+          if (ctHex.length % 2 !== 0) throw new Error('Ciphertext hex has odd length.');
+          var ct = new Uint8Array(ctHex.length / 2);
+          for (var i = 0; i < ctHex.length; i += 2) {
+            ct[i / 2] = parseInt(ctHex.substring(i, i + 2), 16);
+          }
+
+          // AES-256-CBC decrypt; plaintext is UTF-16LE of the JSON string
+          var ck    = await crypto.subtle.importKey('raw', _psDecKey, { name: 'AES-CBC' }, false, ['decrypt']);
+          var plain  = await crypto.subtle.decrypt({ name: 'AES-CBC', iv: iv }, ck, ct);
+          var json   = new TextDecoder('utf-16le').decode(plain);
+          processQRData(json);
+          setStatus('psImportStatus', '\u2713 Decrypted \u2014 Reconstruct card filled.', 'ok');
+        } catch(e) {
+          setStatus('psImportStatus', 'Failed: ' + (e.message || 'wrong key or invalid file'), 'err');
+        }
+      }
+
       function lsbEmbed(imgData, data) {
         var px = imgData.data;
         var need = data.length * 8;
@@ -3916,6 +4013,24 @@ Die 3  1 │  A  B  C  D  E  F     a  b  c  d  e  f     !  @  #  $  %  ^
         });
 
         document.getElementById('stegoExtractBtn').addEventListener('click', doExtract);
+
+        document.getElementById('psDecKeyInput').addEventListener('change', function(e) {
+          var f = e.target.files[0]; if (!f) return;
+          var fr = new FileReader();
+          fr.onload = function(ev) {
+            var kb = parseKeyFile(ev.target.result);
+            if (kb) { _psDecKey = kb; document.getElementById('psDecKeyName').textContent = '\u2713 ' + f.name; setStatus('psImportStatus', '', ''); }
+            else    { document.getElementById('psDecKeyName').textContent = 'Invalid key file'; }
+          };
+          fr.readAsArrayBuffer(f);
+        });
+
+        document.getElementById('psJsonEncInput').addEventListener('change', function(e) {
+          var f = e.target.files[0];
+          document.getElementById('psJsonEncName').textContent = f ? f.name : '';
+        });
+
+        document.getElementById('psImportBtn').addEventListener('click', doPsImport);
       }
 
       window._wireStego = wireStego;
