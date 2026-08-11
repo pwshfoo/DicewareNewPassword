@@ -1,4 +1,4 @@
-﻿# Private helper - cryptographically secure integer in [$Min, $Max).
+# Private helper - cryptographically secure integer in [$Min, $Max).
 # PS7/.NET 5+: RandomNumberGenerator.Fill   PS5.1/.NET Framework: RNGCryptoServiceProvider
 # 32-bit range eliminates meaningful modulo bias (2^32 / 6 leaves <0.0000002% skew).
 function script:Invoke-CryptoRandom {
@@ -16,6 +16,17 @@ function script:Invoke-CryptoRandom {
         $rng.Dispose()
     }
     return [int]([BitConverter]::ToUInt32($bytes, 0) % $range) + $Min
+}
+
+# Private helper - validates a passphrase against caller-supplied policy rules.
+function script:Test-PasswordPolicy {
+    param([string]$Passphrase, [bool]$Upper, [bool]$Lower, [bool]$Numeric, [bool]$NonAlpha, [string]$Exclude)
+    if ($Upper    -and $Passphrase -cnotmatch '[A-Z]')        { return $false }
+    if ($Lower    -and $Passphrase -cnotmatch '[a-z]')        { return $false }
+    if ($Numeric  -and $Passphrase -notmatch  '[0-9]')        { return $false }
+    if ($NonAlpha -and $Passphrase -notmatch  '[^A-Za-z0-9]') { return $false }
+    if ($Exclude) { foreach ($c in $Exclude.ToCharArray()) { if ($Passphrase.Contains([string]$c)) { return $false } } }
+    return $true
 }
 
 function New-Password {
@@ -65,6 +76,22 @@ function New-Password {
 .PARAMETER DataStegoOutput
     Output path for the stego BMP containing the hidden .jsonenc. Defaults to
     .password\<timestamp>_data.bmp in the current directory.
+.PARAMETER RequireUppercase
+    Retry generation until the passphrase contains at least one uppercase letter (A-Z).
+    Satisfied automatically when -UppercaseFirstLetter is true (the default).
+.PARAMETER RequireLowercase
+    Retry generation until the passphrase contains at least one lowercase letter (a-z).
+    Always satisfied by diceware words when -UppercaseFirstLetter is true (the default).
+.PARAMETER RequireNumeric
+    Retry generation until the passphrase contains at least one digit (0-9).
+    Requires -SaltChars > 0 to be satisfiable; a warning is emitted after 100 attempts.
+.PARAMETER RequireNonAlphanumeric
+    Retry generation until the passphrase contains at least one non-alphanumeric character.
+    Requires -SaltChars > 0 to be satisfiable; a warning is emitted after 100 attempts.
+.PARAMETER ExcludeCharacters
+    String of characters that must not appear anywhere in the passphrase.
+    Generation retries up to 100 times to avoid each character in the string.
+    Example: -ExcludeCharacters '"`;\'
 .EXAMPLE
     New-Password
     Returns a 4-word diceware passphrase, e.g. "cheddar-crabgrass-armoire-bundle"
@@ -140,7 +167,23 @@ function New-Password {
         [string]$KeyStegoOutput,
 
         [Parameter()]
-        [string]$DataStegoOutput
+        [string]$DataStegoOutput,
+
+        # Password policy enforcement — retries up to 100 times to satisfy all active rules
+        [Parameter()]
+        [switch]$RequireUppercase,
+
+        [Parameter()]
+        [switch]$RequireLowercase,
+
+        [Parameter()]
+        [switch]$RequireNumeric,
+
+        [Parameter()]
+        [switch]$RequireNonAlphanumeric,
+
+        [Parameter()]
+        [string]$ExcludeCharacters
     )
 
     # Resolve wordlist path: module dir first, then parent dir
@@ -173,34 +216,44 @@ function New-Password {
         throw "Wordlist parsed 0 entries. Verify the file format (expected: 5 digits, tab, word)."
     }
 
-    # Roll 5d6 per word: Get-Random -Maximum is exclusive, so -Maximum 7 yields 1-6
-    $wordRolls = [System.Collections.Generic.List[string]]::new()
-    $words = @(for ($i = 0; $i -lt $WordCount; $i++) {
-        $key = -join (1..5 | ForEach-Object { Invoke-CryptoRandom -Min 1 -Max 7 })
-        $wordRolls.Add($key)
-        $wordMap[$key]
-    })
+    $policyActive = $RequireUppercase -or $RequireLowercase -or $RequireNumeric -or $RequireNonAlphanumeric -or $ExcludeCharacters
+    $attempt = 0
+    do {
+        $attempt++
+        # Roll 5d6 per word: Get-Random -Maximum is exclusive, so -Maximum 7 yields 1-6
+        $wordRolls = [System.Collections.Generic.List[string]]::new()
+        $words = @(for ($i = 0; $i -lt $WordCount; $i++) {
+            $key = -join (1..5 | ForEach-Object { Invoke-CryptoRandom -Min 1 -Max 7 })
+            $wordRolls.Add($key)
+            $wordMap[$key]
+        })
 
-    # UppercaseFirstLetter: capitalize first char of each word before joining
-    if ($UppercaseFirstLetter) {
-        $words = $words | ForEach-Object {
-            if ($_ -and $_.Length -gt 0) { $_.Substring(0,1).ToUpper() + $_.Substring(1) } else { $_ }
+        # UppercaseFirstLetter: capitalize first char of each word before joining
+        if ($UppercaseFirstLetter) {
+            $words = $words | ForEach-Object {
+                if ($_ -and $_.Length -gt 0) { $_.Substring(0,1).ToUpper() + $_.Substring(1) } else { $_ }
+            }
         }
-    }
 
-    # SaltChars: generate a diceware random string and insert it as a salt word at SaltPosition
-    $saltResult  = $null
-    $saltPosUsed = $null
-    if ($SaltChars -gt 0) {
-        $saltResult  = New-DicewareRandomString -Chars $SaltChars
-        $saltPosUsed = [Math]::Min($SaltPosition, $words.Count)
-        $wordList    = [System.Collections.Generic.List[string]]::new()
-        foreach ($w in $words) { $wordList.Add($w) }
-        $wordList.Insert($saltPosUsed, $saltResult.String)
-        $words = $wordList.ToArray()
-    }
+        # SaltChars: generate a diceware random string and insert it as a salt word at SaltPosition
+        $saltResult  = $null
+        $saltPosUsed = $null
+        if ($SaltChars -gt 0) {
+            $saltResult  = New-DicewareRandomString -Chars $SaltChars
+            $saltPosUsed = [Math]::Min($SaltPosition, $words.Count)
+            $wordList    = [System.Collections.Generic.List[string]]::new()
+            foreach ($w in $words) { $wordList.Add($w) }
+            $wordList.Insert($saltPosUsed, $saltResult.String)
+            $words = $wordList.ToArray()
+        }
 
-    $passphrase = $words -join $Separator
+        $passphrase = $words -join $Separator
+    } while ($policyActive -and $attempt -lt 100 -and
+             -not (Test-PasswordPolicy $passphrase $RequireUppercase $RequireLowercase $RequireNumeric $RequireNonAlphanumeric $ExcludeCharacters))
+
+    if ($policyActive -and -not (Test-PasswordPolicy $passphrase $RequireUppercase $RequireLowercase $RequireNumeric $RequireNonAlphanumeric $ExcludeCharacters)) {
+        Write-Warning "Password policy could not be satisfied after 100 attempts. Consider increasing -SaltChars."
+    }
 
     $global:DICEWARE = [pscustomobject]@{
         Password     = if ($PlainText) { $passphrase } else { ConvertTo-SecureString $passphrase -AsPlainText -Force }
