@@ -127,6 +127,30 @@
     }
     .check-label input[type="checkbox"] { accent-color: #4a78c8; width: 16px; height: 16px; cursor: pointer; }
 
+    /* ── Policy section ── */
+    .policy-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px 16px; margin-top: 10px;
+    }
+    @media (max-width: 500px) { .policy-grid { grid-template-columns: 1fr; } }
+    .policy-status-bar {
+      display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+      margin-bottom: 16px; padding: 10px 12px;
+      border-radius: 10px; border: 1.5px solid transparent;
+    }
+    .policy-status-bar.all-pass { background: rgba(34,168,106,0.07); border-color: rgba(34,168,106,0.3); }
+    .policy-status-bar.has-fail { background: rgba(239,68,68,0.06);  border-color: rgba(239,68,68,0.25); }
+    .policy-pill {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-family: system-ui, sans-serif; font-size: 11px; font-weight: 600;
+      border-radius: 50px; padding: 2px 8px;
+    }
+    .policy-pill.pass { background: rgba(34,168,106,0.15); color: #16865a; }
+    .policy-pill.fail { background: rgba(239,68,68,0.15);  color: #b91c1c; }
+    .policy-warn-text {
+      font-family: system-ui, sans-serif; font-size: 11px; color: #b45309;
+      flex-basis: 100%; margin-top: 2px;
+    }
+
     /* Generate button */
     .btn-generate {
       width: 100%; padding: 14px;
@@ -2765,6 +2789,24 @@ var qrcode = function() {
 
     </div>
 
+    <details id="policyDetails" style="margin-bottom:16px">
+      <summary style="font-family:system-ui,sans-serif;font-size:13px;color:#6b7a99;cursor:pointer;padding:8px 0;border-top:1px solid rgba(0,0,0,0.07)">
+        &#9881;&nbsp; Password Policy Requirements
+      </summary>
+      <div style="padding:12px 0 4px">
+        <div class="policy-grid">
+          <label class="check-label"><input type="checkbox" id="policyUpper"> Uppercase (A&ndash;Z)</label>
+          <label class="check-label"><input type="checkbox" id="policyLower"> Lowercase (a&ndash;z)</label>
+          <label class="check-label"><input type="checkbox" id="policyDigit"> Numeric (0&ndash;9)</label>
+          <label class="check-label"><input type="checkbox" id="policySpecial"> Non-Alphanumeric (!@# &hellip;)</label>
+        </div>
+        <div class="field" style="margin-top:12px">
+          <label for="policyExclude">Exclude Characters</label>
+          <input type="text" id="policyExclude" placeholder='Characters to prohibit, e.g.  &quot; \ ; `' style="font-family:monospace">
+        </div>
+      </div>
+    </details>
+
     <button class="btn-generate" id="generateBtn">Generate Passphrase</button>
   </div>
 
@@ -2783,6 +2825,8 @@ var qrcode = function() {
       <button class="btn-action" id="qrBtn">⊞ QR Code</button>
       <button class="btn-action" id="printBtn">🖶 Print Sheet</button>
     </div>
+
+    <div id="policyStatus" style="display:none"></div>
 
     <div class="entropy-section">
       <div class="entropy-header">
@@ -3098,7 +3142,45 @@ Die 3  1 │  A  B  C  D  E  F     a  b  c  d  e  f     !  @  #  $  %  ^
       };
     }
 
-    // ── UI helpers ─────────────────────────────────────────────────────────
+    // ── Policy helpers ────────────────────────────────────────────────────
+    function getPolicy() {
+      return {
+        upper:   document.getElementById('policyUpper').checked,
+        lower:   document.getElementById('policyLower').checked,
+        digit:   document.getElementById('policyDigit').checked,
+        special: document.getElementById('policySpecial').checked,
+        exclude: document.getElementById('policyExclude').value
+      };
+    }
+    function checkPolicy(passphrase, p) {
+      const r = [];
+      if (p.upper)   r.push({ label: 'Uppercase',        pass: /[A-Z]/.test(passphrase) });
+      if (p.lower)   r.push({ label: 'Lowercase',        pass: /[a-z]/.test(passphrase) });
+      if (p.digit)   r.push({ label: 'Numeric',          pass: /[0-9]/.test(passphrase) });
+      if (p.special) r.push({ label: 'Non-Alphanumeric', pass: /[^A-Za-z0-9]/.test(passphrase) });
+      if (p.exclude) {
+        const chars = [...new Set(p.exclude)];
+        r.push({ label: `Exclude (${chars.join('')})`, pass: !chars.some(c => passphrase.includes(c)) });
+      }
+      return r;
+    }
+    function policyActive(p) {
+      return p.upper || p.lower || p.digit || p.special || p.exclude.length > 0;
+    }
+    function displayPolicyStatus(passphrase, policy) {
+      const el = document.getElementById('policyStatus');
+      if (!policyActive(policy)) { el.style.display = 'none'; return; }
+      const results = checkPolicy(passphrase, policy);
+      const allPass = results.every(r => r.pass);
+      const pills   = results.map(r =>
+        `<span class="policy-pill ${r.pass ? 'pass' : 'fail'}">${r.pass ? '\u2714' : '\u2716'} ${escHtml(r.label)}</span>`
+      ).join('');
+      const warn = allPass ? '' : `<span class="policy-warn-text">&#9888; Not fully satisfied after 100 attempts &mdash; consider increasing Salt Characters.</span>`;
+      el.innerHTML = `<div class="policy-status-bar ${allPass ? 'all-pass' : 'has-fail'}">${pills}${warn}</div>`;
+      el.style.display = 'block';
+    }
+
+    // ── UI helpers ────────────────────────────────────────────────────────
     function tierInfo(bits) {
       if (bits >= 100) return { label: 'Tier 0 SA',  cls: 'tier-max',  pct: 100,  color: '#7c3aed' };
       if (bits >=  80) return { label: 'Tier 0',     cls: 'tier-0',    pct:  85,  color: '#4a78c8' };
@@ -3591,10 +3673,14 @@ Die 3  1 │  A  B  C  D  E  F     a  b  c  d  e  f     !  @  #  $  %  ^
         spNum.disabled = e.target.checked;
       });
 
-      // Generate
+      // Generate (retry up to 100× to satisfy policy)
       document.getElementById('generateBtn').addEventListener('click', () => {
-        const r = generate();
+        const policy = getPolicy();
+        let r, attempts = 0;
+        do { r = generate(); attempts++; }
+        while (policyActive(policy) && !checkPolicy(r.passphrase, policy).every(x => x.pass) && attempts < 100);
         displayResult(r);
+        displayPolicyStatus(r.passphrase, policy);
         window._lastResult = r;
       });
 
