@@ -20,12 +20,13 @@ function script:Invoke-CryptoRandom {
 
 # Private helper - validates a passphrase against caller-supplied policy rules.
 function script:Test-PasswordPolicy {
-    param([string]$Passphrase, [bool]$Upper, [bool]$Lower, [bool]$Numeric, [bool]$NonAlpha, [string]$Exclude)
+    param([string]$Passphrase, [bool]$Upper, [bool]$Lower, [bool]$Numeric, [bool]$NonAlpha, [string]$Exclude, [int]$MaxLen = 0)
     if ($Upper    -and $Passphrase -cnotmatch '[A-Z]')        { return $false }
     if ($Lower    -and $Passphrase -cnotmatch '[a-z]')        { return $false }
     if ($Numeric  -and $Passphrase -notmatch  '[0-9]')        { return $false }
     if ($NonAlpha -and $Passphrase -notmatch  '[^A-Za-z0-9]') { return $false }
     if ($Exclude) { foreach ($c in $Exclude.ToCharArray()) { if ($Passphrase.Contains([string]$c)) { return $false } } }
+    if ($MaxLen -gt 0 -and $Passphrase.Length -gt $MaxLen)    { return $false }
     return $true
 }
 
@@ -92,6 +93,10 @@ function New-Password {
     String of characters that must not appear anywhere in the passphrase.
     Generation retries up to 100 times to avoid each character in the string.
     Example: -ExcludeCharacters '"`;\'
+.PARAMETER MaxLength
+    Maximum number of characters allowed in the passphrase.
+    Generation retries up to 100 times to produce a passphrase within the limit.
+    A warning is emitted if the limit cannot be satisfied after 100 attempts.
 .EXAMPLE
     New-Password
     Returns a 4-word diceware passphrase, e.g. "cheddar-crabgrass-armoire-bundle"
@@ -183,7 +188,11 @@ function New-Password {
         [switch]$RequireNonAlphanumeric,
 
         [Parameter()]
-        [string]$ExcludeCharacters
+        [string]$ExcludeCharacters,
+
+        [Parameter()]
+        [ValidateRange(1, 9999)]
+        [int]$MaxLength = 0
     )
 
     # Resolve wordlist path: module dir first, then parent dir
@@ -216,7 +225,7 @@ function New-Password {
         throw "Wordlist parsed 0 entries. Verify the file format (expected: 5 digits, tab, word)."
     }
 
-    $policyActive = $RequireUppercase -or $RequireLowercase -or $RequireNumeric -or $RequireNonAlphanumeric -or $ExcludeCharacters
+    $policyActive = $RequireUppercase -or $RequireLowercase -or $RequireNumeric -or $RequireNonAlphanumeric -or $ExcludeCharacters -or ($MaxLength -gt 0)
     $attempt = 0
     do {
         $attempt++
@@ -249,9 +258,9 @@ function New-Password {
 
         $passphrase = $words -join $Separator
     } while ($policyActive -and $attempt -lt 100 -and
-             -not (Test-PasswordPolicy $passphrase $RequireUppercase $RequireLowercase $RequireNumeric $RequireNonAlphanumeric $ExcludeCharacters))
+             -not (Test-PasswordPolicy $passphrase $RequireUppercase $RequireLowercase $RequireNumeric $RequireNonAlphanumeric $ExcludeCharacters $MaxLength))
 
-    if ($policyActive -and -not (Test-PasswordPolicy $passphrase $RequireUppercase $RequireLowercase $RequireNumeric $RequireNonAlphanumeric $ExcludeCharacters)) {
+    if ($policyActive -and -not (Test-PasswordPolicy $passphrase $RequireUppercase $RequireLowercase $RequireNumeric $RequireNonAlphanumeric $ExcludeCharacters $MaxLength)) {
         Write-Warning "Password policy could not be satisfied after 100 attempts. Consider increasing -SaltChars."
     }
 
