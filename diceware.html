@@ -2800,9 +2800,15 @@ var qrcode = function() {
           <label class="check-label"><input type="checkbox" id="policyDigit"> Numeric (0&ndash;9)</label>
           <label class="check-label"><input type="checkbox" id="policySpecial"> Non-Alphanumeric (!@# &hellip;)</label>
         </div>
-        <div class="field" style="margin-top:12px">
-          <label for="policyExclude">Exclude Characters</label>
-          <input type="text" id="policyExclude" placeholder='Characters to prohibit, e.g.  &quot; \ ; `' style="font-family:monospace">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;margin-top:12px">
+          <div class="field">
+            <label for="policyExclude">Exclude Characters</label>
+            <input type="text" id="policyExclude" placeholder='Characters to prohibit, e.g.  &quot; \ ; `' style="font-family:monospace">
+          </div>
+          <div class="field">
+            <label for="policyMaxLen">Max Length (characters)</label>
+            <input type="number" id="policyMaxLen" min="1" placeholder="No limit" style="width:100%">
+          </div>
         </div>
       </div>
     </details>
@@ -3149,7 +3155,8 @@ Die 3  1 │  A  B  C  D  E  F     a  b  c  d  e  f     !  @  #  $  %  ^
         lower:   document.getElementById('policyLower').checked,
         digit:   document.getElementById('policyDigit').checked,
         special: document.getElementById('policySpecial').checked,
-        exclude: document.getElementById('policyExclude').value
+        exclude: document.getElementById('policyExclude').value,
+        maxLen:  parseInt(document.getElementById('policyMaxLen').value) || 0
       };
     }
     function checkPolicy(passphrase, p) {
@@ -3162,10 +3169,13 @@ Die 3  1 │  A  B  C  D  E  F     a  b  c  d  e  f     !  @  #  $  %  ^
         const chars = [...new Set(p.exclude)];
         r.push({ label: `Exclude (${chars.join('')})`, pass: !chars.some(c => passphrase.includes(c)) });
       }
+      if (p.maxLen > 0) {
+        r.push({ label: `Max ${p.maxLen} chars (${passphrase.length})`, pass: passphrase.length <= p.maxLen });
+      }
       return r;
     }
     function policyActive(p) {
-      return p.upper || p.lower || p.digit || p.special || p.exclude.length > 0;
+      return p.upper || p.lower || p.digit || p.special || p.exclude.length > 0 || p.maxLen > 0;
     }
     function displayPolicyStatus(passphrase, policy) {
       const el = document.getElementById('policyStatus');
